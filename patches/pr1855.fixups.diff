@@ -34,3 +34,37 @@ index 6b418de3..0b0c0b70 100644
          .where(' media.tmdbId in (:...finalIds)', { finalIds })
          .getMany();
  
+diff --git a/src/components/MediaSlider/index.tsx b/src/components/MediaSlider/index.tsx
+index e7e09cbf..1b6423a5 100644
+--- a/src/components/MediaSlider/index.tsx
++++ b/src/components/MediaSlider/index.tsx
+@@ -89,10 +89,8 @@ const MediaSlider = ({
+       }
+ 
+       return (
+-        i.mediaInfo?.status === MediaStatus.AVAILABLE ||
+-        i.mediaInfo?.status === MediaStatus.PARTIALLY_AVAILABLE ||
+-        !i.mediaInfo?.requests ||
+-        i.mediaInfo.requests.length === 0
++        i.mediaInfo?.status !== MediaStatus.PENDING &&
++        i.mediaInfo?.status !== MediaStatus.PROCESSING
+       );
+     });
+   }
+diff --git a/src/hooks/useDiscover.ts b/src/hooks/useDiscover.ts
+index 95bc9c45..9805fc78 100644
+--- a/src/hooks/useDiscover.ts
++++ b/src/hooks/useDiscover.ts
+@@ -147,10 +147,8 @@ const useDiscover = <
+     titles = titles.filter(
+       (i) =>
+         (i.mediaType === 'movie' || i.mediaType === 'tv') &&
+-        (i.mediaInfo?.status === MediaStatus.AVAILABLE ||
+-          i.mediaInfo?.status === MediaStatus.PARTIALLY_AVAILABLE ||
+-          !i.mediaInfo?.requests ||
+-          i.mediaInfo.requests.length === 0)
++        i.mediaInfo?.status !== MediaStatus.PENDING &&
++        i.mediaInfo?.status !== MediaStatus.PROCESSING
+     );
+   }
+ 

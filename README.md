@@ -10,7 +10,7 @@ Seerr has long had a *Hide Available Media* setting, but nothing to hide titles 
 
 This repo publishes the **latest official seerr release with that PR applied**, plus two small reviewed fixes to it (documented in [patches/](patches/README.md)). Nothing else is changed. You get a new **Hide Requested Media** checkbox in *Settings → General*, right next to *Hide Available Media*:
 
-- Titles with an **active** request (pending or approved-and-processing) disappear from Discover pages and sliders; declined requests don't hide anything
+- Titles that are **requested or processing** (the ones showing a Requested/Processing badge — whether requested in seerr or synced from Radarr/Sonarr) disappear from Discover pages and sliders; declined requests don't hide anything
 - They stay visible in **search**, so you can still find them and see their request status
 - Global admin setting, off by default — same behavior the upstream PR will ship, with its review findings already fixed
 
