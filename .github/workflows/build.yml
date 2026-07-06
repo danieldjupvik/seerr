@@ -1,0 +1,167 @@
+name: build
+
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even if the latest upstream release was already built
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: seerr-team/seerr
+  PR_NUMBER: '1855'
+  IMAGE: ghcr.io/${{ github.repository }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stop if PR 1855 was merged or closed upstream
+        run: |
+          pr="$(gh api "repos/$UPSTREAM_REPO/pulls/$PR_NUMBER")"
+          merged="$(jq -r .merged <<<"$pr")"
+          state="$(jq -r .state <<<"$pr")"
+          if [ "$merged" = "true" ]; then
+            title="Upstream PR #$PR_NUMBER was MERGED — time to switch back to the official image"
+            body="The hide-requested feature was merged into seerr upstream.
+
+          **What to do now:**
+          1. Wait for the next seerr release that includes it (check https://github.com/$UPSTREAM_REPO/releases — the release notes will mention hiding requested media, or PR #$PR_NUMBER).
+          2. In Unraid, change the container repository back to \`ghcr.io/seerr-team/seerr:latest\`.
+          3. In seerr Settings → General, enable **Hide Requested Media**.
+          4. Archive or delete this repo.
+
+          Until that release ships, your current image keeps working — it already contains this feature. This workflow has disabled itself and will not build again."
+          elif [ "$state" = "closed" ]; then
+            title="Upstream PR #$PR_NUMBER was CLOSED without merging"
+            body="The hide-requested PR was closed upstream without being merged. Your current image keeps working, but no new upstream releases will be picked up until you decide what to do (find a replacement PR and update PR_NUMBER in build.yml, or retire this repo). This workflow has disabled itself."
+          else
+            echo "PR #$PR_NUMBER is still open — continuing."
+            exit 0
+          fi
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq length)"
+          if [ "$existing" = "0" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
+          gh workflow disable build.yml --repo "$GITHUB_REPOSITORY" || true
+          echo "::error::$title"
+          exit 1
+
+      - name: Determine latest upstream release
+        id: rel
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          tag="$(gh api "repos/$UPSTREAM_REPO/releases/latest" --jq .tag_name)"
+          if ! grep -qE '^v[0-9][A-Za-z0-9._-]*$' <<<"$tag"; then
+            echo "::error::Upstream release tag has unexpected format: $tag"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          last="$(cat .last-built 2>/dev/null || echo none)"
+          if [ "$tag" = "$last" ] && [ "$FORCE" != "true" ]; then
+            echo "Already built $tag — nothing to do."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New upstream release $tag (last built: $last)."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Keepalive commit if repo is going stale
+        if: steps.rel.outputs.build == 'false'
+        run: |
+          age_days=$(( ( $(date +%s) - $(git log -1 --format=%ct) ) / 86400 ))
+          if [ "$age_days" -ge 45 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "chore: keepalive so the schedule is not auto-disabled"
+            git push
+          fi
+
+      - name: Fetch upstream source at release tag
+        if: steps.rel.outputs.build == 'true'
+        env:
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: git clone --depth 1 --branch "$TAG" "https://github.com/$UPSTREAM_REPO.git" upstream
+
+      - name: Apply vendored patches
+        if: steps.rel.outputs.build == 'true'
+        env:
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: |
+          cd upstream
+          for patch in ../patches/*.diff; do
+            if ! git apply --check "$patch"; then
+              title="Vendored patch $(basename "$patch") no longer applies to $TAG"
+              existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq length)"
+              if [ "$existing" = "0" ]; then
+                gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+                  --body "The vendored patch conflicts with the new upstream release. Your current image keeps working, but it is now behind upstream. Re-download the updated diff from its source PR, review it, replace the file in patches/, and commit — see patches/README.md."
+              fi
+              echo "::error::$title"
+              exit 1
+            fi
+            git apply "$patch"
+            echo "Applied $(basename "$patch")"
+          done
+
+      - name: Set up Docker Buildx
+        if: steps.rel.outputs.build == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: steps.rel.outputs.build == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push image
+        if: steps.rel.outputs.build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: upstream
+          push: true
+          platforms: linux/amd64
+          build-args: COMMIT_TAG=${{ steps.rel.outputs.tag }}-pr1855
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ steps.rel.outputs.tag }}-pr1855
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=seerr ${{ steps.rel.outputs.tag }} + PR 1855 (hide requested media)
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Record built tag
+        if: steps.rel.outputs.build == 'true'
+        env:
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: |
+          echo "$TAG" > .last-built
+          if git diff --quiet -- .last-built; then
+            echo "Forced rebuild of $TAG — .last-built unchanged, nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .last-built
+          git commit -m "chore: built $TAG"
+          git push
