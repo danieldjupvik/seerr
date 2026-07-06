@@ -1,44 +1,101 @@
-# seerr (patched)
+# seerr + Hide Requested Media
 
-Automated build of [seerr](https://github.com/seerr-team/seerr) with [PR #1855](https://github.com/seerr-team/seerr/pull/1855) ("hide already requested media") applied on top of the latest official release. Adds a **Hide Requested Media** checkbox to Settings → General, next to the existing Hide Available Media setting.
+**[seerr](https://github.com/seerr-team/seerr), with the ability to hide already-requested titles from Discover — available today, before it lands upstream.**
 
-This is a temporary bridge until PR #1855 merges upstream — see [issue #1048](https://github.com/seerr-team/seerr/issues/1048). The same pipeline can carry additional patches in the future: each one is just another diff applied in [build.yml](.github/workflows/build.yml) before the image is built.
-
-## Image
-
-```
+```text
 ghcr.io/danieldjupvik/seerr:latest
 ```
 
-Drop-in replacement for `ghcr.io/seerr-team/seerr:latest` — same app, same config format, same volumes and ports (`linux/amd64` only). In the Unraid container settings, change the **Repository** field to the image above; leave everything else untouched. Switching back later is the same edit in reverse.
+Seerr has long had a *Hide Available Media* setting, but nothing to hide titles you've already **requested** — so Discover pages fill up with things you've already asked for. That feature has been requested for years across [Overseerr #3681](https://github.com/sct/overseerr/issues/3681), Jellyseerr, and [seerr #1048](https://github.com/seerr-team/seerr/issues/1048), and an implementation exists in [PR #1855](https://github.com/seerr-team/seerr/pull/1855) — it just hasn't been merged yet.
 
-Each build is also tagged `<upstream version>-pr1855` (e.g. `v3.3.0-pr1855`) if you ever need to pin or roll back.
+This repo publishes the **latest official seerr release with that PR applied**. Nothing else is changed. You get a new **Hide Requested Media** checkbox in *Settings → General*, right next to *Hide Available Media*:
 
-## How it works
+- Titles with pending or processing requests disappear from Discover pages and sliders
+- They stay visible in **search**, so you can still find them and see their request status
+- Global admin setting, off by default — identical behavior to the upstream PR, because it *is* the upstream PR
 
-A daily scheduled workflow ([build.yml](.github/workflows/build.yml)):
+## Quick start
 
-1. Checks whether PR #1855 is still open upstream. If it was **merged or closed**, the workflow opens an issue in this repo telling you to switch back to the official image, disables itself, and fails — that issue is your signal to retire the patch.
-2. Fetches the latest upstream release tag and compares it to [.last-built](.last-built). If already built, it exits in seconds (with an occasional empty keepalive commit so GitHub doesn't auto-disable the schedule after 60 days of inactivity).
-3. On a new release: clones upstream at that tag, applies the PR diff fresh from the GitHub API, builds with upstream's own Dockerfile, and pushes to GHCR. If the diff no longer applies, it opens an issue and fails instead of shipping a broken image.
+The image is a **drop-in replacement** for `ghcr.io/seerr-team/seerr:latest` — same app, same ports, same config format. Switching in either direction is just changing the image name; your existing config and database are untouched.
 
-There is no fork to keep in sync — every build starts from pristine upstream source plus the PR diff.
+### Docker Compose
 
-## One-time setup after the first successful build
+```yaml
+services:
+  seerr:
+    image: ghcr.io/danieldjupvik/seerr:latest
+    container_name: seerr
+    environment:
+      - TZ=Europe/Oslo
+    ports:
+      - 5055:5055
+    volumes:
+      - ./config:/app/config
+    restart: unless-stopped
+```
 
-The first push creates the GHCR package as **private**. Make it public so Unraid can pull without credentials and it doesn't count against private package storage:
+### Docker CLI
 
-GitHub profile → Packages → `seerr` → Package settings → Change visibility → Public.
+```bash
+docker run -d \
+  --name seerr \
+  -e TZ=Europe/Oslo \
+  -p 5055:5055 \
+  -v /path/to/config:/app/config \
+  --restart unless-stopped \
+  ghcr.io/danieldjupvik/seerr:latest
+```
 
-## Manual build
+### Unraid
 
-Actions → build → Run workflow (tick **force** to rebuild the current release, e.g. to pick up a rebased version of the PR diff).
+Edit your existing seerr container and change the **Repository** field to `ghcr.io/danieldjupvik/seerr:latest`. Everything else stays the same.
 
-## Failure modes
+### Enable the feature
 
-| Event | What happens |
+After starting: **Settings → General → Hide Requested Media** → check it, save.
+
+## Tags
+
+| Tag | Meaning |
 | --- | --- |
-| PR merged upstream | Issue opened with switch-back instructions, workflow disables itself. Your running image keeps working. |
-| PR closed without merge | Issue opened, workflow disables itself. |
-| PR diff conflicts with a new release | Issue opened, build fails, previous image stays available. You're behind upstream until the PR is rebased or you retire the patch. |
-| No new release | ~5-second no-op run. |
+| `latest` | Newest upstream release + the patch (mirrors upstream's `latest`) |
+| `vX.Y.Z-pr1855` | Pinned build of a specific upstream release, for rollback |
+
+## How it stays up to date
+
+A [scheduled GitHub Actions workflow](.github/workflows/build.yml) runs daily:
+
+1. Checks that [PR #1855](https://github.com/seerr-team/seerr/pull/1855) is still open upstream.
+2. Checks for a new upstream release. If there's nothing new, it exits — no rebuild, no image churn.
+3. On a new release: clones upstream at the release tag, applies the **vendored, reviewed copy of the PR diff** ([patches/pr1855.diff](patches/pr1855.diff), pinned to a specific PR commit — see [patches/README.md](patches/README.md)), builds with upstream's own unmodified Dockerfile, and pushes. Typically live within 24 hours of an upstream release.
+
+There is no fork being maintained here. Every build starts from pristine upstream source; the only delta is the vendored diff, applied at build time. The patch content is never fetched from the network during a build — it can only change through a reviewed commit in this repo.
+
+## Can I trust this image?
+
+Reasonable question for any third-party image. You don't have to take anyone's word:
+
+- **Everything is built in public.** Every image comes from a GitHub Actions run in this repo — the [full build logs](../../actions) show exactly which upstream tag was cloned and which diff was applied. There are no manual pushes and no secrets involved beyond the repo's own `GITHUB_TOKEN`.
+- **The only change is a pinned, vendored diff** ([patches/pr1855.diff](patches/pr1855.diff)) of a public upstream PR written by [@0xSysR3ll](https://github.com/0xSysR3ll). You can read every line of it here, and diff it against the upstream PR yourself. Builds never pull patch content from the network, so an update to the upstream PR branch cannot silently change this image.
+- **Don't want to trust it anyway? Run your own.** Fork this repo, enable Actions, and you'll build and publish the identical image into your own GHCR namespace in ~20 minutes.
+
+## Limitations
+
+- **`linux/amd64` only.** No ARM builds (keeps CI fast; open an issue if you'd genuinely use one).
+- **Up to 24h behind upstream releases** (daily schedule).
+- **Global setting, not per-user** — same as the upstream PR and the existing Hide Available Media setting.
+- **If a new upstream release conflicts with the patch**, no image is published for it: the pipeline fails loudly and the previous version stays available until the vendored diff is updated (reviewed, then committed). You keep a working seerr; you're just temporarily behind.
+- **Not affiliated with the seerr team.** If you hit a seerr bug while on this image, please reproduce it on the official image before reporting it upstream — don't send the maintainers chasing ghosts from a patched build.
+
+## What happens when the PR merges upstream?
+
+This repo retires itself. The daily workflow detects the merge, opens an issue here with switch-back instructions, and disables itself. At that point: wait for the next official release containing the feature, change your image back to `ghcr.io/seerr-team/seerr:latest`, and keep the checkbox — it'll be the real one. Your config carries over cleanly, including the setting itself.
+
+If you want this to happen sooner, go 👍 [PR #1855](https://github.com/seerr-team/seerr/pull/1855) and [issue #1048](https://github.com/seerr-team/seerr/issues/1048).
+
+## Credits
+
+- The [seerr team](https://github.com/seerr-team) — the actual application (formerly Jellyseerr/Overseerr)
+- [@0xSysR3ll](https://github.com/0xSysR3ll) — author of the hide-requested feature in PR #1855
+
+This repo is just plumbing that connects the two a little earlier than the release cycle would.
