@@ -23,3 +23,7 @@ To pick up a rebased/updated upstream PR: re-download the diff, **review it**, r
 ## Whitespace
 
 Vendored PR diffs are kept byte-identical to their upstream source so they can be audited against the PR, including any whitespace quirks in the code they add. `.gitattributes` exempts `patches/*.diff` from git whitespace checks instead of altering the files.
+
+## License
+
+The diffs in this directory are portions of [seerr](https://github.com/seerr-team/seerr), licensed under the [MIT License](https://github.com/seerr-team/seerr/blob/develop/LICENSE), Copyright (c) 2020 sct and seerr contributors. This repo's own [LICENSE](../LICENSE) covers only the build pipeline, not the vendored patch content.
