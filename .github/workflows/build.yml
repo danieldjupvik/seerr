@@ -23,7 +23,7 @@ concurrency:
 env:
   UPSTREAM_REPO: seerr-team/seerr
   PR_NUMBER: '1855'
-  IMAGE: ghcr.io/${{ github.repository_owner }}/seerr-hide-requested
+  IMAGE: ghcr.io/${{ github.repository }}
   GH_TOKEN: ${{ github.token }}
 
 jobs:
