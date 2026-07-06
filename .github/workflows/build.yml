@@ -100,24 +100,26 @@ jobs:
           TAG: ${{ steps.rel.outputs.tag }}
         run: git clone --depth 1 --branch "$TAG" "https://github.com/$UPSTREAM_REPO.git" upstream
 
-      - name: Apply PR 1855 diff
+      - name: Apply vendored patches
         if: steps.rel.outputs.build == 'true'
         env:
           TAG: ${{ steps.rel.outputs.tag }}
         run: |
-          gh api -H "Accept: application/vnd.github.diff" "repos/$UPSTREAM_REPO/pulls/$PR_NUMBER" > pr.diff
           cd upstream
-          if ! git apply --check ../pr.diff; then
-            title="PR #$PR_NUMBER no longer applies to $TAG"
-            existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq length)"
-            if [ "$existing" = "0" ]; then
-              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
-                --body "The patch conflicts with the new upstream release. Your current image keeps working, but it is now behind upstream. Either wait for the PR author to rebase, or retire this repo and live without the filter until the PR merges."
+          for patch in ../patches/*.diff; do
+            if ! git apply --check "$patch"; then
+              title="Vendored patch $(basename "$patch") no longer applies to $TAG"
+              existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq length)"
+              if [ "$existing" = "0" ]; then
+                gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+                  --body "The vendored patch conflicts with the new upstream release. Your current image keeps working, but it is now behind upstream. Re-download the updated diff from its source PR, review it, replace the file in patches/, and commit — see patches/README.md."
+              fi
+              echo "::error::$title"
+              exit 1
             fi
-            echo "::error::$title"
-            exit 1
-          fi
-          git apply ../pr.diff
+            git apply "$patch"
+            echo "Applied $(basename "$patch")"
+          done
 
       - name: Set up Docker Buildx
         if: steps.rel.outputs.build == 'true'
