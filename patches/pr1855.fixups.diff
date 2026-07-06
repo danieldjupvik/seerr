@@ -1,0 +1,36 @@
+diff --git a/server/entity/Media.ts b/server/entity/Media.ts
+index 6b418de3..0b0c0b70 100644
+--- a/server/entity/Media.ts
++++ b/server/entity/Media.ts
+@@ -1,6 +1,10 @@
+ import RadarrAPI from '@server/api/servarr/radarr';
+ import SonarrAPI from '@server/api/servarr/sonarr';
+-import { MediaStatus, MediaType } from '@server/constants/media';
++import {
++  MediaRequestStatus,
++  MediaStatus,
++  MediaType,
++} from '@server/constants/media';
+ import { MediaServerType } from '@server/constants/server';
+ import { getRepository } from '@server/datasource';
+ import { Blocklist } from '@server/entity/Blocklist';
+@@ -50,7 +54,18 @@ class Media {
+           'media.id= watchlist.media and watchlist.requestedBy = :userId',
+           { userId: user?.id }
+         )
+-        .leftJoinAndSelect('media.requests', 'requests')
++        .leftJoin(
++          'media.requests',
++          'requests',
++          'requests.status NOT IN (:...inactiveStatuses)',
++          {
++            inactiveStatuses: [
++              MediaRequestStatus.DECLINED,
++              MediaRequestStatus.COMPLETED,
++            ],
++          }
++        )
++        .addSelect(['requests.id', 'requests.status'])
+         .where(' media.tmdbId in (:...finalIds)', { finalIds })
+         .getMany();
+ 

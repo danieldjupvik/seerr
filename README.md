@@ -8,11 +8,11 @@ ghcr.io/danieldjupvik/seerr:latest
 
 Seerr has long had a *Hide Available Media* setting, but nothing to hide titles you've already **requested** — so Discover pages fill up with things you've already asked for. That feature has been requested for years across [Overseerr #3681](https://github.com/sct/overseerr/issues/3681), Jellyseerr, and [seerr #1048](https://github.com/seerr-team/seerr/issues/1048), and an implementation exists in [PR #1855](https://github.com/seerr-team/seerr/pull/1855) — it just hasn't been merged yet.
 
-This repo publishes the **latest official seerr release with that PR applied**. Nothing else is changed. You get a new **Hide Requested Media** checkbox in *Settings → General*, right next to *Hide Available Media*:
+This repo publishes the **latest official seerr release with that PR applied**, plus two small reviewed fixes to it (documented in [patches/](patches/README.md)). Nothing else is changed. You get a new **Hide Requested Media** checkbox in *Settings → General*, right next to *Hide Available Media*:
 
-- Titles with pending or processing requests disappear from Discover pages and sliders
+- Titles with an **active** request (pending or approved-and-processing) disappear from Discover pages and sliders; declined requests don't hide anything
 - They stay visible in **search**, so you can still find them and see their request status
-- Global admin setting, off by default — identical behavior to the upstream PR, because it *is* the upstream PR
+- Global admin setting, off by default — same behavior the upstream PR will ship, with its review findings already fixed
 
 ## Quick start
 
@@ -67,16 +67,16 @@ A [scheduled GitHub Actions workflow](.github/workflows/build.yml) runs daily:
 
 1. Checks that [PR #1855](https://github.com/seerr-team/seerr/pull/1855) is still open upstream.
 2. Checks for a new upstream release. If there's nothing new, it exits — no rebuild, no image churn.
-3. On a new release: clones upstream at the release tag, applies the **vendored, reviewed copy of the PR diff** ([patches/pr1855.diff](patches/pr1855.diff), pinned to a specific PR commit — see [patches/README.md](patches/README.md)), builds with upstream's own unmodified Dockerfile, and pushes. Typically live within 24 hours of an upstream release.
+3. On a new release: clones upstream at the release tag, applies the **vendored, reviewed patches** (the PR diff pinned to a specific PR commit, plus small reviewed fixes — see [patches/README.md](patches/README.md)), builds with upstream's own unmodified Dockerfile, and pushes. Typically live within 24 hours of an upstream release.
 
-There is no fork being maintained here. Every build starts from pristine upstream source; the only delta is the vendored diff, applied at build time. The patch content is never fetched from the network during a build — it can only change through a reviewed commit in this repo.
+There is no fork being maintained here. Every build starts from pristine upstream source; the only delta is the vendored patches, applied at build time. The patch content is never fetched from the network during a build — it can only change through a reviewed commit in this repo.
 
 ## Can I trust this image?
 
 Reasonable question for any third-party image. You don't have to take anyone's word:
 
 - **Everything is built in public.** Every image comes from a GitHub Actions run in this repo — the [full build logs](../../actions) show exactly which upstream tag was cloned and which diff was applied. There are no manual pushes and no secrets involved beyond the repo's own `GITHUB_TOKEN`.
-- **The only change is a pinned, vendored diff** ([patches/pr1855.diff](patches/pr1855.diff)) of a public upstream PR written by [@0xSysR3ll](https://github.com/0xSysR3ll). You can read every line of it here, and diff it against the upstream PR yourself. Builds never pull patch content from the network, so an update to the upstream PR branch cannot silently change this image.
+- **The only changes are pinned, vendored diffs** ([patches/](patches/)): the public upstream PR written by [@0xSysR3ll](https://github.com/0xSysR3ll), verbatim, plus a small documented fixup. You can read every line here, and diff the PR copy against the upstream PR yourself. Builds never pull patch content from the network, so an update to the upstream PR branch cannot silently change this image.
 - **Don't want to trust it anyway? Run your own.** Fork this repo, enable Actions, and you'll build and publish the identical image into your own GHCR namespace in ~20 minutes.
 
 ## Limitations
