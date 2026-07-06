@@ -9,12 +9,11 @@ Applied by the build workflow on top of the upstream release source, in lexicogr
 
 ## What the fixups change
 
-Two issues found in review of the PR code, fixed server-side in `Media.getRelatedMedia`:
+Three issues found reviewing and running the PR code:
 
-1. **Only active requests hide a title.** The PR hides any title with request rows, but declined request rows persist forever — a declined title would never reappear in Discover. The join now excludes `DECLINED` and `COMPLETED` requests, matching how the rest of seerr defines active requests.
-2. **Minimal payload instead of full request rows.** The PR's `leftJoinAndSelect` serialized entire `MediaRequest` rows into every discover/search/related-media response. The join now selects only `id` and `status` — all the frontend needs for its length check.
-
-Both fixes live in one server-side join, so the PR's frontend code works unmodified.
+1. **Hide by media status, not request rows.** The PR hides only titles with seerr request rows — but media synced from Radarr/Sonarr (added there directly or picked up by the scheduled scan) shows the same "Requested"/"Processing" badge while having no request rows, so it stayed visible. The discover filters now hide on media status `PENDING`/`PROCESSING`, exactly matching the badge, and covering both seerr requests and arr-synced items. A declined request resets media status, so declined titles correctly reappear.
+2. **Minimal payload instead of full request rows.** The PR's `leftJoinAndSelect` serialized entire `MediaRequest` rows into every discover/search/related-media response. The join now selects only `id` and `status`.
+3. **Only active requests in the payload.** The join excludes `DECLINED` and `COMPLETED` request rows, matching how the rest of seerr defines active requests.
 
 ## Updating a patch
 

@@ -10,9 +10,9 @@ Seerr has long had a *Hide Available Media* setting, but nothing to hide titles 
 
 This repo publishes the **latest official seerr release with that PR applied**, plus two small reviewed fixes to it (documented in [patches/](patches/README.md)). Nothing else is changed. You get a new **Hide Requested Media** checkbox in *Settings → General*, right next to *Hide Available Media*:
 
-- Titles with an **active** request (pending or approved-and-processing) disappear from Discover pages and sliders; declined requests don't hide anything
+- Titles that are **requested or processing** (the ones showing a Requested/Processing badge — whether requested in seerr or synced from Radarr/Sonarr) disappear from Discover pages and sliders; declined requests don't hide anything
 - They stay visible in **search**, so you can still find them and see their request status
-- Global admin setting, off by default — same behavior the upstream PR will ship, with its review findings already fixed
+- Global admin setting, off by default — based on the upstream PR, with its review findings fixed and hiding extended to cover arr-synced titles (see [patches/](patches/README.md))
 
 ## Quick start
 
@@ -89,7 +89,7 @@ Reasonable question for any third-party image. You don't have to take anyone's w
 
 ## What happens when the PR merges upstream?
 
-This repo retires itself. The scheduled workflow detects the merge, opens an issue here with switch-back instructions, and disables itself. At that point: wait for the next official release containing the feature, change your image back to `ghcr.io/seerr-team/seerr:latest`, and keep the checkbox — it'll be the real one. Your config carries over cleanly, including the setting itself.
+This repo retires itself. The scheduled workflow detects the merge, opens an issue here with switch-back instructions, and disables itself. At that point: wait for the next official release containing the feature, change your image back to `ghcr.io/seerr-team/seerr:latest`, and keep the checkbox — it'll be the real one. Your config carries over cleanly, including the setting itself. One behavioral note: as currently written, the upstream PR hides only titles requested *through seerr* — this image also hides titles synced from Radarr/Sonarr. If that gap matters to you, weigh in on the upstream PR.
 
 If you want this to happen sooner, go 👍 [PR #1855](https://github.com/seerr-team/seerr/pull/1855) and [issue #1048](https://github.com/seerr-team/seerr/issues/1048).
 
