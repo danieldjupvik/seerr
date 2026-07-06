@@ -1,0 +1,3 @@
+# Vendored patches are byte-identical copies of upstream PR diffs;
+# exempt them from whitespace checks rather than altering their content.
+patches/*.diff -whitespace
