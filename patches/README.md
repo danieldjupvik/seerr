@@ -19,3 +19,7 @@ Both fixes live in one server-side join, so the PR's frontend code works unmodif
 ## Updating a patch
 
 To pick up a rebased/updated upstream PR: re-download the diff, **review it**, replace `pr1855.diff`, re-verify the fixups still apply on top, and commit — the content shipped into the image only ever changes through a reviewed commit in this repo.
+
+## Whitespace
+
+Vendored PR diffs are kept byte-identical to their upstream source so they can be audited against the PR, including any whitespace quirks in the code they add. `.gitattributes` exempts `patches/*.diff` from git whitespace checks instead of altering the files.
