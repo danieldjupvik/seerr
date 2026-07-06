@@ -63,11 +63,11 @@ After starting: **Settings → General → Hide Requested Media** → check it, 
 
 ## How it stays up to date
 
-A [scheduled GitHub Actions workflow](.github/workflows/build.yml) runs daily:
+A [scheduled GitHub Actions workflow](.github/workflows/build.yml) runs weekly (and on every merged patch change):
 
 1. Checks that [PR #1855](https://github.com/seerr-team/seerr/pull/1855) is still open upstream.
 2. Checks for a new upstream release. If there's nothing new, it exits — no rebuild, no image churn.
-3. On a new release: clones upstream at the release tag, applies the **vendored, reviewed patches** (the PR diff pinned to a specific PR commit, plus small reviewed fixes — see [patches/README.md](patches/README.md)), builds with upstream's own unmodified Dockerfile, and pushes. Typically live within 24 hours of an upstream release.
+3. On a new release: clones upstream at the release tag, applies the **vendored, reviewed patches** (the PR diff pinned to a specific PR commit, plus small reviewed fixes — see [patches/README.md](patches/README.md)), builds with upstream's own unmodified Dockerfile, and pushes. Typically live within a week of an upstream release.
 
 There is no fork being maintained here. Every build starts from pristine upstream source; the only delta is the vendored patches, applied at build time. The patch content is never fetched from the network during a build — it can only change through a reviewed commit in this repo.
 
@@ -82,14 +82,14 @@ Reasonable question for any third-party image. You don't have to take anyone's w
 ## Limitations
 
 - **`linux/amd64` only.** No ARM builds (keeps CI fast; open an issue if you'd genuinely use one).
-- **Up to 24h behind upstream releases** (daily schedule).
+- **Up to a week behind upstream releases** (weekly schedule; run the workflow manually if you want a release sooner).
 - **Global setting, not per-user** — same as the upstream PR and the existing Hide Available Media setting.
 - **If a new upstream release conflicts with the patch**, no image is published for it: the pipeline fails loudly and the previous version stays available until the vendored diff is updated (reviewed, then committed). You keep a working seerr; you're just temporarily behind.
 - **Not affiliated with the seerr team.** If you hit a seerr bug while on this image, please reproduce it on the official image before reporting it upstream — don't send the maintainers chasing ghosts from a patched build.
 
 ## What happens when the PR merges upstream?
 
-This repo retires itself. The daily workflow detects the merge, opens an issue here with switch-back instructions, and disables itself. At that point: wait for the next official release containing the feature, change your image back to `ghcr.io/seerr-team/seerr:latest`, and keep the checkbox — it'll be the real one. Your config carries over cleanly, including the setting itself.
+This repo retires itself. The scheduled workflow detects the merge, opens an issue here with switch-back instructions, and disables itself. At that point: wait for the next official release containing the feature, change your image back to `ghcr.io/seerr-team/seerr:latest`, and keep the checkbox — it'll be the real one. Your config carries over cleanly, including the setting itself.
 
 If you want this to happen sooner, go 👍 [PR #1855](https://github.com/seerr-team/seerr/pull/1855) and [issue #1048](https://github.com/seerr-team/seerr/issues/1048).
 

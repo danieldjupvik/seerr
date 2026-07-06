@@ -2,7 +2,12 @@ name: build
 
 on:
   schedule:
-    - cron: '23 5 * * *'
+    - cron: '23 5 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - 'patches/**'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
     inputs:
       force:
@@ -75,11 +80,11 @@ jobs:
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           last="$(cat .last-built 2>/dev/null || echo none)"
-          if [ "$tag" = "$last" ] && [ "$FORCE" != "true" ]; then
+          if [ "$tag" = "$last" ] && [ "$FORCE" != "true" ] && [ "$GITHUB_EVENT_NAME" != "push" ]; then
             echo "Already built $tag — nothing to do."
             echo "build=false" >> "$GITHUB_OUTPUT"
           else
-            echo "New upstream release $tag (last built: $last)."
+            echo "Rebuilding $tag (last built: $last, event: $GITHUB_EVENT_NAME)."
             echo "build=true" >> "$GITHUB_OUTPUT"
           fi
 
